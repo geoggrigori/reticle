@@ -51,7 +51,7 @@ describe('advice names a call the reader can actually make', () => {
     expect(out).not.toContain('reticle_run');
     expect(out).not.toContain('reticle_lease');
     // The CLI is the escape hatch that survives on every surface, because it is not a tool.
-    expect(out).toContain('reticle open');
+    expect(out).toContain('npx @reticlehq/server open');
     // The call nests `args: { … }`; a body that stopped at the first `}` left the outer one behind.
     expect(out).not.toMatch(/\}\s*$/);
   });
@@ -64,7 +64,7 @@ describe('advice names a call the reader can actually make', () => {
    * from matching, and the replacement landed INSIDE the original quoting. Driving a real session
    * produced this, which is what an agent was asked to read:
    *
-   *   with `the CLI: `reticle open <url>` (a human can equivalently run `reticle drive <url>`)`
+   *   with `the CLI: `npx @reticlehq/server open <url>` (a human can equivalently run `npx @reticlehq/server drive <url>`)`
    *   (a human can equivalently run `reticle drive <url>`) — note that a lease is a SEPARATE …
    *
    * The clause twice, and backticks nested three deep. Using the constant is the point of the test:
@@ -74,7 +74,7 @@ describe('advice names a call the reader can actually make', () => {
     const out = liveCallText(HIDDEN_TAB_RECOMMENDATION, MERGED);
     expect(out).not.toContain('reticle_run');
     expect(out).not.toContain('reticle_lease');
-    expect(out).toContain('reticle open');
+    expect(out).toContain('npx @reticlehq/server open');
     // The tell for both defects: the human-equivalent clause appearing more than once.
     expect(out.match(/a human can equivalently run/g) ?? []).toHaveLength(1);
     // The nesting tell: the replacement opening immediately after the original's opening backtick.
@@ -100,7 +100,7 @@ describe('advice names a call the reader can actually make', () => {
     expect(out).not.toContain('reticle_run');
     expect(out).not.toContain('reticle_lease');
     const parsed = JSON.parse(out) as { recovery: string };
-    expect(parsed.recovery).toContain('reticle open');
+    expect(parsed.recovery).toContain('npx @reticlehq/server open');
   });
 
   /**
