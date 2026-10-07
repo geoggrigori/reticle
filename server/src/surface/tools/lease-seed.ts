@@ -70,6 +70,9 @@ export function looksLikeStorageStateExport(seed: unknown): boolean {
  * with ANSI codes) into a short, clean reason — so the agent/user sees "is the app running?" instead
  * of an internals-leaking wall of text.
  */
+/** What {@link cleanNavError} answers for a navigation that ran out of time. */
+const NAV_TIMED_OUT = 'navigation timed out';
+
 export function cleanNavError(err: unknown, seed?: SeedStorage): string {
   const rawMsg = err instanceof Error ? err.message : String(err);
   const msg = scrubSeedFromError(rawMsg, seed);
@@ -79,12 +82,35 @@ export function cleanNavError(err: unknown, seed?: SeedStorage): string {
   const firstLine = (msg.split('\n')[0] ?? msg).replace(ansi, '');
   const netCode = /net::[A-Z_]+/.exec(firstLine);
   if (netCode !== null) return netCode[0];
-  if (/timeout/i.test(firstLine)) return 'navigation timed out';
+  if (/timeout/i.test(firstLine)) return NAV_TIMED_OUT;
   return firstLine
     .replace(/^page\.goto:\s*/, '')
     .replace(/\s+at\s+https?:\/\/\S+.*$/, '')
     .trim()
     .slice(0, 100);
+}
+
+/**
+ * The sentence for a lease whose first navigation failed.
+ *
+ * A timeout and a refused connection are different stories and get different sentences. A refusal
+ * means nothing is serving there, so "is the app running there?" is the right question. A timeout
+ * means something accepted the connection and did not finish the page in time — a dev server
+ * compiling a route for the first time routinely takes longer than the navigation budget — and the
+ * same question sends the agent looking for a dev server that is running, instead of retrying.
+ */
+export function navFailureMessage(url: string, err: unknown, seed?: SeedStorage): string {
+  const reason = cleanNavError(err, seed);
+  if (NAV_TIMED_OUT !== reason)
+    return `could not open ${url} — is the app running there? (${reason})`;
+  const rawMsg = err instanceof Error ? err.message : String(err);
+  const budgetMs = /Timeout (\d+)ms exceeded/.exec(rawMsg)?.[1];
+  const within = budgetMs === undefined ? 'in time' : `within ${String(Number(budgetMs) / 1000)} s`;
+  return (
+    `could not open ${url} — the server accepted the connection but the page did not finish ` +
+    `loading ${within} (${reason}). A dev server compiling a route for the first time can take ` +
+    'longer: retry the acquire.'
+  );
 }
 
 /**
