@@ -64,7 +64,7 @@ describe('advice names a call the reader can actually make', () => {
    * from matching, and the replacement landed INSIDE the original quoting. Driving a real session
    * produced this, which is what an agent was asked to read:
    *
-   *   with `the CLI: `npx @reticlehq/server open <url>` (a human can equivalently run `npx @reticlehq/server drive <url>`)`
+   *   with `the CLI: `reticle open <url>` (a human can equivalently run `reticle drive <url>`)`
    *   (a human can equivalently run `reticle drive <url>`) — note that a lease is a SEPARATE …
    *
    * The clause twice, and backticks nested three deep. Using the constant is the point of the test:
