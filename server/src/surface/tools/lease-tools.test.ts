@@ -31,6 +31,7 @@ import {
 import type { Session } from '@/portal/session/session.js';
 import { ReticleTool } from '@reticlehq/core';
 import type { ToolDeps } from './tool-kit.js';
+import { claimedArtifactRoot } from '@/memory/project/root-claims.js';
 import type { BrowserPool, Lease } from '@/portal/pool/browser-pool.js';
 
 function tool(name: string): (deps: ToolDeps, args: Record<string, unknown>) => Promise<unknown> {
@@ -171,6 +172,24 @@ describe('a lease the platform opens for a drive', () => {
     expect(headed.reused).toBeUndefined();
     expect(acquired.map((a) => a.headed)).toEqual([undefined, true]);
     expect(new URL(acquired[1]?.url ?? '').searchParams.get(RETICLE_URL_PARAM.HUD)).toBe('removed');
+  });
+});
+
+/*
+ * A lease opened by `reticle try` or a chat drive wrote wherever the page's project id resolved —
+ * `~/.reticle/unmatched/` for an app with none — so the run never synced and try's wait timed out.
+ */
+describe('a lease opened for a caller’s project', () => {
+  it('writes into the root the caller named, from the moment its page registers', async () => {
+    const { pool, acquired } = fakePool();
+    await tool(ReticleTool.LEASE_ACQUIRE)(
+      { ...baseDeps, pool },
+      { url: 'http://localhost:3100/', root: '/work/shop/.reticle' },
+    );
+    const leaseId = acquired[0]?.sessionId ?? '';
+    expect(claimedArtifactRoot(leaseId, acquired[0]?.url)).toBe('/work/shop/.reticle');
+    await tool(ReticleTool.LEASE_RELEASE)({ ...baseDeps, pool }, { sessionId: leaseId });
+    expect(claimedArtifactRoot(leaseId, undefined)).toBeUndefined();
   });
 });
 
@@ -582,6 +601,50 @@ describe('reticle_lease_acquire', () => {
     // A generous per-test budget, not a duration assertion: this is the ONLY case that pays the
     // real readiness wait, because proving "no SDK ever dialled in" means letting it run out.
   }, 20_000);
+
+  it('does not report a freshly minted lease ready while its tab is hidden (#1351)', async () => {
+    // A hidden tab throttles timers and rAF: the SDK dialled in, yet nothing on the page can be
+    // verified. Neither existing reason fits — the install is fine and the tab is answering.
+    const { pool } = fakePool();
+    const hiddenTab = {
+      info: () => ({ hidden: true }),
+      command: () => Promise.resolve({ ok: true }),
+    };
+    const sessions = { get: () => hiddenTab, all: () => [] };
+
+    const result = (await tool(ReticleTool.LEASE_ACQUIRE)(
+      { ...baseDeps, pool, sessions } as unknown as ToolDeps,
+      { url: 'http://localhost:3000/' },
+    )) as { ready: boolean; notReadyReason?: string };
+
+    expect(result.ready).toBe(false);
+    expect(result.notReadyReason).toBe(LeaseNotReadyReason.TAB_HIDDEN);
+  });
+
+  it('does not report a reused lease ready while its tab is hidden', async () => {
+    const { pool } = fakePool();
+    const first = (await tool(ReticleTool.LEASE_ACQUIRE)(
+      { ...baseDeps, pool },
+      { url: 'http://localhost:3000/' },
+    )) as { sessionId: string };
+    const hiddenTab = {
+      info: () => ({ hidden: true }),
+      command: () => Promise.resolve({ ok: true }),
+    };
+    const sessions = {
+      get: (i: string) => (i === first.sessionId ? hiddenTab : undefined),
+      all: () => [],
+    };
+
+    const second = (await tool(ReticleTool.LEASE_ACQUIRE)(
+      { ...baseDeps, pool, sessions } as unknown as ToolDeps,
+      { url: 'http://localhost:3000/' },
+    )) as { ready: boolean; reused?: boolean; notReadyReason?: string };
+
+    expect(second.reused).toBe(true);
+    expect(second.ready).toBe(false);
+    expect(second.notReadyReason).toBe(LeaseNotReadyReason.TAB_HIDDEN);
+  });
 
   it('treats a session it cannot probe as alive, rather than failing a working lease', async () => {
     // Fail OPEN. A registry entry with no `command` is a shape this code did not put there, and
