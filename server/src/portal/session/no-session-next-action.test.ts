@@ -311,7 +311,7 @@ describe('nextActionFor', () => {
       lastKnownUrl: 'http://127.0.0.1:44549/orders',
     });
     expect(next.action).toBe(NoSessionAction.REOPEN_APP);
-    expect(next.command).toBe('reticle open http://127.0.0.1:44549/orders');
+    expect(next.command).toBe('npx @reticlehq/server open http://127.0.0.1:44549/orders');
   });
 
   it('the departed port still answers: reopen it, as before', () => {
@@ -323,7 +323,7 @@ describe('nextActionFor', () => {
       lastKnownUrl: 'http://127.0.0.1:44549/orders',
     });
     expect(next.action).toBe(NoSessionAction.REOPEN_APP);
-    expect(next.command).toBe('reticle open http://127.0.0.1:44549/orders');
+    expect(next.command).toBe('npx @reticlehq/server open http://127.0.0.1:44549/orders');
   });
 });
 
